@@ -16,10 +16,24 @@ void player_init(void)
 //Update player position based on user input
 void player_update(const Uint8 *keystate)
 {
-    if(keystate[SDL_SCANCODE_W]) { player.y -= player.speed; }
-    if(keystate[SDL_SCANCODE_S]) { player.y += player.speed; }
-    if(keystate[SDL_SCANCODE_A]) { player.x -= player.speed; }
-    if(keystate[SDL_SCANCODE_D]) { player.x += player.speed; }
+    bool W = keystate[SDL_SCANCODE_W];
+    bool S = keystate[SDL_SCANCODE_S];
+    bool A = keystate[SDL_SCANCODE_A];
+    bool D = keystate[SDL_SCANCODE_D];
+
+    float diagonal_speed = player.speed / 1.4142f; //Adjust speed for diagonal movement
+
+    //Straight movement
+    if(W && !A && !D) { player.y -= player.speed; }
+    if(S && !A && !D) { player.y += player.speed; }
+    if(A && !W && !S) { player.x -= player.speed; }
+    if(D && !W && !S) { player.x += player.speed; }
+
+    //Diagonal movement
+    if(W && A) { player.y -= diagonal_speed; player.x -= diagonal_speed; }
+    if(W && D) { player.y -= diagonal_speed; player.x += diagonal_speed; }
+    if(S && A) { player.y += diagonal_speed; player.x -= diagonal_speed; }
+    if(S && D) { player.y += diagonal_speed; player.x += diagonal_speed; }
 }
 
 //Render player sprite (placeholder as a rectangle for now)
