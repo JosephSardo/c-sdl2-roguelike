@@ -32,6 +32,10 @@ typedef struct{
     float dir_y;
     float range;
     float angle_cos;
+
+    //animation properties
+    float angle;
+    float swing_progress;
 } Attack;
 
 typedef struct{

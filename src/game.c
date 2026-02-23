@@ -12,7 +12,7 @@ static Mouse mouse;
 
 //textures
 static SDL_Texture *player_texture = NULL;
-static SDL_Texture *weapon_texture = NULL;
+static SDL_Texture *sword_texture = NULL;
 
 //Track mouse position and button states
 void mouse_update(void)
@@ -27,7 +27,7 @@ void player_init(void)
 {
     player.x = 400;
     player.y = 300;
-    player.speed = 0.3f; //Pixels per frame
+    player.speed = 1.0f; //Pixels per frame
 }
 
 //Update player position based on user input
@@ -71,9 +71,10 @@ void attack_start(void)
     attack.width = 48;
     attack.height = 48;
     attack.damage = 1;
-    attack.timer = 200; //Frames until attack disappears
-    attack.cooldown_max = 100; //Frames until next attack can be started
+    attack.timer = 100; //Frames until attack disappears
+    attack.cooldown_max = 20; //Frames until next attack can be started
     attack.active = 1;
+    attack.swing_progress = 0.0f; //Reset animation progress
 
     attack.cooldown = attack.timer + attack.cooldown_max; //Start cooldown immediately after attack starts
 
@@ -106,6 +107,11 @@ void attack_update(void)
 
     if(!attack.active) return;
 
+    attack.swing_progress += 0.05f; //swing speed
+    /*if(attack.swing_progress > 1.0f) {
+        attack.swing_progress = 1.0f; //Cap swing progress at 1.0
+    }*/
+
     attack.timer--;
     if(attack.timer <= 0) {
         attack.active = 0; //Deactivate attack after timer runs out
@@ -117,24 +123,30 @@ void attack_render(void)
 {
     if(!attack.active) return;
 
-    /*SDL_Rect rect = { (int)attack.x, (int)attack.y, attack.width, attack.height };
-    SDL_SetRenderDrawColor(renderer, 250, 250, 80, 255);
-    SDL_RenderFillRect(renderer, &rect);*/
-
     float cx = player.x + 16; //Player center x
-    float cy = player.y + 16; //Player center y
+    float cy = player.y + 0; //Player center y
 
-    SDL_SetRenderDrawColor(renderer, 250, 250, 80, 255);
+    float swing_point; //actual position of the sword during animation.
+    swing_point = 1.5 / (1 + pow(2.71828f, -2 * (attack.swing_progress - 0.5f))); //logistic function for smooth swing animation
+    swing_point -= 0.5f; //Center around 0
+    
+    if(swing_point > 1.0f) swing_point = 1.0f; //Cap swing point at 1 (failsafe)
 
-    for(int i = -45; i <= 45; i++)
-    {
-        float angle = atan2f(attack.dir_y, attack.dir_x) + i * 3.14159f/180.0f;
+    float base_angle = atan2f(attack.dir_y, attack.dir_x) * 180.0f / 3.14159f; //Base angle in degrees
+    float swing_offset = 50.0f - swing_point * 100.0f; //Swing from -50° to +50°
+    float sprite_offset = 45.0f; //Offset to position sprite correctly (depends on sprite design)
+    attack.angle = base_angle + swing_offset + sprite_offset;
 
-        float x = cx + cosf(angle) * attack.range;
-        float y = cy + sinf(angle) * attack.range;
+    SDL_Rect dest;
+    dest.w = 64;
+    dest.h = 64;
+    dest.x = (int)(cx);
+    dest.y = (int)(cy - 41);
 
-        SDL_RenderDrawLine(renderer, cx, cy, x, y);
-    }
+    SDL_Point pivot = { 0, 60 }; //Pivot point for rotation (handle of the sword)
+
+    SDL_RenderCopyEx(renderer, sword_texture, NULL, &dest, attack.angle, &pivot, SDL_FLIP_NONE);
+    
 }
 
 //Hitbox calculation
@@ -171,6 +183,12 @@ bool game_init(void)
         return false;
     }
 
+    //initialize texture loading for PNG files
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
+        printf("SDL_image Error: %s\n", IMG_GetError());
+        return false;
+    }
+
     window = SDL_CreateWindow(
         "Roguelike",
         SDL_WINDOWPOS_CENTERED,
@@ -191,6 +209,14 @@ bool game_init(void)
         return false;
     }
 
+    //init textures
+    sword_texture = IMG_LoadTexture(renderer, "assets/nightsedge.png");
+    if (!sword_texture) {
+        printf("Failed to load sword: %s\n", IMG_GetError());
+        return false;
+    }
+
+    //init player stats
     player_init();
     attack.active = 0; //No active attack at start
 
@@ -235,10 +261,12 @@ void game_render(void)
     SDL_RenderPresent(renderer);
 }
 
-//Close game cleanly, free resources
+//Close game cleanly, free resources and destroy textures
 void game_cleanup(void)
 {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    SDL_DestroyTexture(sword_texture);
+    IMG_Quit();
     SDL_Quit();
 }
